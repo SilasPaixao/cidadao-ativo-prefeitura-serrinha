@@ -1,10 +1,10 @@
-# fly.toml app configuration file generated for cidadao-ativo-prefeitura-serrinha on 2026-03-02T06:05:55Z
+# fly.toml app configuration file generated for cidadao-ativo-prefeitura-serrinha on 2026-03-02T07:02:42Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
 app = 'cidadao-ativo-prefeitura-serrinha'
-primary_region = 'iad'
+primary_region = 'gru'
 
 [build]
 
@@ -21,6 +21,3 @@ primary_region = 'iad'
   cpu_kind = 'shared'
   cpus = 1
   memory_mb = 1024
-  
-[env]
-  NODE_ENV = "production"
