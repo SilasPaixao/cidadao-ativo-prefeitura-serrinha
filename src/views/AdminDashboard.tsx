@@ -1401,7 +1401,19 @@ export default function AdminDashboard() {
                 size="small" 
                 startIcon={<OpenInNew />}
                 sx={{ mt: 1, fontWeight: 700, textTransform: 'none' }}
-                onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${selectedIssue.latitude},${selectedIssue.longitude}`, '_blank')}
+                onClick={() => {
+                  let addressToSearch = selectedIssue.address || '';
+                  // O ponto de referência é mantido para exibição no painel, 
+                  // mas removido aqui (texto entre parênteses) para não confundir a busca do Google Maps
+                  if (addressToSearch.includes('(')) {
+                    addressToSearch = addressToSearch.split('(')[0].trim();
+                  }
+                  
+                  const query = addressToSearch 
+                    ? `${addressToSearch}, Serrinha, BA` 
+                    : `${selectedIssue.latitude},${selectedIssue.longitude}`;
+                  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
+                }}
               >
                 Abrir no Google Maps
               </Button>

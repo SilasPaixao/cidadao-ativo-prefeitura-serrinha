@@ -3,37 +3,26 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url       = env("DATABASE_URL")  // Pooler aqui
-  // directUrl = env("DIRECT_URL")    // Direct aqui (migrations)
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  CITIZEN
-  GOVERNMENT
-  ADMIN
-}
+// UserRole enum alternative for SQLite
+// CITIZEN, GOVERNMENT, ADMIN
 
-enum IssueStatus {
-  PENDING
-  IN_PROGRESS
-  RESOLVED
-  REJECTED
-}
+// IssueStatus enum alternative for SQLite
+// PENDING, IN_PROGRESS, RESOLVED, REJECTED
 
-enum UserStatus {
-  PENDING
-  ACTIVE
-  REJECTED
-}
+// UserStatus enum alternative for SQLite
+// PENDING, ACTIVE, REJECTED
 
 model User {
   id            String    @id @default(uuid())
   email         String    @unique
   password      String
   name          String
-  role          UserRole  @default(CITIZEN)
-  status        UserStatus @default(ACTIVE)
+  role          String    @default("CITIZEN")
+  status        String    @default("ACTIVE")
   whatsapp      String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -52,7 +41,7 @@ model Issue {
   reporterEmail String?
   whatsapp      String?
   imageUrl      String?
-  status        IssueStatus          @default(PENDING)
+  status        String               @default("PENDING")
   userId        String?
   user          User?                @relation(fields: [userId], references: [id])
   
@@ -97,7 +86,7 @@ model IssueStatusHistory {
   id          String      @id @default(uuid())
   issueId     String
   issue       Issue       @relation(fields: [issueId], references: [id])
-  status      IssueStatus
+  status      String
   comment     String?
   changedById String
   changedBy   User        @relation(fields: [changedById], references: [id])

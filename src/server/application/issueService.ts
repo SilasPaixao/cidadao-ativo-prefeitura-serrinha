@@ -44,8 +44,8 @@ export class IssueService {
             "role" TEXT NOT NULL DEFAULT 'CITIZEN',
             "status" TEXT NOT NULL DEFAULT 'ACTIVE',
             "whatsapp" TEXT,
-            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT "User_pkey" PRIMARY KEY ("id")
           );
         `);
@@ -63,16 +63,16 @@ export class IssueService {
             "protocol" TEXT NOT NULL,
             "category" TEXT NOT NULL,
             "description" TEXT NOT NULL,
-            "latitude" DOUBLE PRECISION NOT NULL,
-            "longitude" DOUBLE PRECISION NOT NULL,
+            "latitude" REAL NOT NULL,
+            "longitude" REAL NOT NULL,
             "address" TEXT,
             "reporterEmail" TEXT,
             "whatsapp" TEXT,
             "imageUrl" TEXT,
             "status" TEXT NOT NULL DEFAULT 'PENDING',
             "userId" TEXT,
-            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT "Issue_pkey" PRIMARY KEY ("id")
           );
         `);
@@ -82,15 +82,17 @@ export class IssueService {
       }
 
       // 3. Ensure columns and other tables...
+      // SQLite doesn't support ADD COLUMN IF NOT EXISTS easily in one command for some versions, 
+      // but we can try or just rely on prisma db push.
       try {
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "reporterEmail" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "whatsapp" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "address" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "userId" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'ACTIVE';`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "whatsapp" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "reporterEmail" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "whatsapp" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "address" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "userId" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN "status" TEXT DEFAULT 'ACTIVE';`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN "whatsapp" TEXT;`).catch(() => {});
       } catch (e) {
-        console.warn("⚠️ Error altering tables:", e);
+        // Ignore errors if columns already exist
       }
 
       try {
@@ -101,24 +103,24 @@ export class IssueService {
             "address" TEXT NOT NULL,
             "reference" TEXT NOT NULL,
             "imageUrl" TEXT NOT NULL,
-            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT "Pole_pkey" PRIMARY KEY ("id")
           );
         `);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Pole" ADD COLUMN IF NOT EXISTS "neighborhood" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Pole" ADD COLUMN "neighborhood" TEXT;`).catch(() => {});
       } catch (e) {
         console.warn("⚠️ Error ensuring Pole table:", e);
       }
 
       try {
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "poleId" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "isNearPole" BOOLEAN;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "poleAddress" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "poleReference" TEXT;`);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "poleImageUrl" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "poleId" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "isNearPole" BOOLEAN;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "poleAddress" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "poleReference" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "poleImageUrl" TEXT;`).catch(() => {});
       } catch (e) {
-        console.warn("⚠️ Error adding pole columns to Issue:", e);
+        // Ignore
       }
 
       try {
@@ -130,7 +132,7 @@ export class IssueService {
             "status" TEXT NOT NULL,
             "comment" TEXT,
             "changedById" TEXT NOT NULL,
-            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT "IssueStatusHistory_pkey" PRIMARY KEY ("id")
           );
         `);
@@ -150,12 +152,12 @@ export class IssueService {
             "status" TEXT NOT NULL,
             "lastError" TEXT,
             "attempts" INTEGER NOT NULL DEFAULT 0,
-            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            "sentAt" TIMESTAMP(3),
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "sentAt" DATETIME,
             CONSTRAINT "WhatsAppLog_pkey" PRIMARY KEY ("id")
           );
         `);
-        await prisma.$executeRawUnsafe(`ALTER TABLE "WhatsAppLog" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "WhatsAppLog" ADD COLUMN "imageUrl" TEXT;`).catch(() => {});
       } catch (e) {
         console.warn("⚠️ Error ensuring WhatsAppLog table:", e);
       }
@@ -167,9 +169,9 @@ export class IssueService {
             "id" TEXT NOT NULL,
             "token" TEXT NOT NULL,
             "email" TEXT NOT NULL,
-            "expiresAt" TIMESTAMP(3) NOT NULL,
-            "used" BOOLEAN NOT NULL DEFAULT false,
-            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "expiresAt" DATETIME NOT NULL,
+            "used" BOOLEAN NOT NULL DEFAULT 0,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT "PasswordResetToken_pkey" PRIMARY KEY ("id")
           );
         `);
@@ -183,8 +185,6 @@ export class IssueService {
       IssueService.columnChecked = true;
     } catch (e: any) {
       console.error("❌ Could not ensure database schema:", e);
-      if (e.code) console.error("Prisma Error Code:", e.code);
-      if (e.meta) console.error("Prisma Error Meta:", JSON.stringify(e.meta));
     }
   }
 
