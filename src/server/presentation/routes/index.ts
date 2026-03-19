@@ -45,6 +45,7 @@ function handleError(res: Response, error: any, status: number = 400) {
   }
 
   if (error instanceof z.ZodError) {
+    console.error("Zod Validation Error Details:", JSON.stringify(error.issues, null, 2));
     return res.status(400).json({ error: error.issues[0].message });
   }
   const message = error.message || "Ocorreu um erro interno";
@@ -170,6 +171,16 @@ export function setupRoutes(app: Express) {
       if (!req.file) return res.status(400).json({ error: "Foto do poste é obrigatória" });
       const data = createPoleSchema.parse(req.body);
       const pole = await poleService.createPole(data, req.file);
+      res.json(pole);
+    } catch (error: any) {
+      handleError(res, error);
+    }
+  });
+
+  app.put("/api/admin/poles/:id", authenticate, authorize(["ADMIN"]), upload.single("image"), async (req, res) => {
+    try {
+      const data = createPoleSchema.partial().parse(req.body);
+      const pole = await poleService.updatePole(req.params.id, data, req.file);
       res.json(pole);
     } catch (error: any) {
       handleError(res, error);
@@ -305,9 +316,13 @@ export function setupRoutes(app: Express) {
       const { lat, lon } = req.query;
       if (!lat || !lon) return res.status(400).json({ error: "Latitude e longitude são obrigatórios" });
       
+      const geocodeEmail = process.env.BREVO_SENDER_EMAIL;
+      if (!geocodeEmail) {
+        console.warn('BREVO_SENDER_EMAIL not set for geocoding user-agent');
+      }
       const response = await (await import("axios")).default.get(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`, {
         headers: {
-          'User-Agent': 'SerrinhaConectada/1.0 (silaspaixao873@gmail.com)'
+          'User-Agent': `SerrinhaConectada/1.0 (${geocodeEmail})`
         }
       });
       

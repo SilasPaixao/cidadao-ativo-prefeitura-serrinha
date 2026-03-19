@@ -42,13 +42,13 @@ export class AuthService {
       return;
     }
 
-    // Verifica se já existe QUALQUER administrador no sistema
-    const anyAdmin = await prisma.user.findFirst({
-      where: { role: "ADMIN" }
+    // Verifica se o administrador padrão já existe pelo e-mail
+    const existingAdmin = await prisma.user.findUnique({
+      where: { email: adminEmail.toLowerCase().trim() }
     });
 
-    if (anyAdmin) {
-      console.log("✅ Já existe um administrador no sistema. Pulando criação do usuário padrão.");
+    if (existingAdmin) {
+      console.log(`✅ Administrador padrão (${adminEmail}) já existe. Pulando criação.`);
       return;
     }
 
@@ -127,6 +127,7 @@ export class AuthService {
       throw new Error("Credenciais inválidas");
     }
 
+    console.log(`🔍 Tentando login para: ${email} (Role: ${user.role}, Status: ${user.status})`);
     const isPasswordValid = await argon2.verify(user.password, password);
     if (!isPasswordValid) {
       console.log(`🔍 Login falhou: Senha incorreta para (${email})`);

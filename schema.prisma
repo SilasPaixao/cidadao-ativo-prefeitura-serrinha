@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// UserRole enum alternative for SQLite
+// UserRole enum alternative for postgresql
 // CITIZEN, GOVERNMENT, ADMIN
 
 // IssueStatus enum alternative for SQLite
@@ -52,6 +52,7 @@ model Issue {
   poleAddress   String?
   poleReference String?
   poleImageUrl  String?
+  poleLocationUrl String?
 
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
@@ -63,6 +64,7 @@ model Pole {
   address       String
   neighborhood  String?
   reference     String
+  locationUrl   String?
   imageUrl      String
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

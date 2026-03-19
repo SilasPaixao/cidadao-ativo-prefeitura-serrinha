@@ -6,17 +6,18 @@ import { format } from "date-fns";
 export const createIssueSchema = z.object({
   category: z.string({ message: "Categoria é obrigatória" }).min(1, "Categoria é obrigatória"),
   description: z.string({ message: "Descrição é obrigatória" }).min(1, "Descrição é obrigatória"),
-  latitude: z.number({ message: "Latitude é obrigatória" }),
-  longitude: z.number({ message: "Longitude é obrigatória" }),
+  latitude: z.coerce.number({ message: "Latitude é obrigatória" }),
+  longitude: z.coerce.number({ message: "Longitude é obrigatória" }),
   address: z.string().optional(),
   whatsapp: z.string().optional().refine(val => !val || /^\d{10,15}$/.test(val.replace(/\D/g, '')), {
     message: "WhatsApp deve conter apenas números com DDD (10-11 dígitos)"
   }),
   poleId: z.string().optional().or(z.literal("")),
-  isNearPole: z.boolean().optional(),
+  isNearPole: z.coerce.boolean().optional(),
   poleAddress: z.string().optional(),
   poleReference: z.string().optional(),
   poleImageUrl: z.string().optional(),
+  poleLocationUrl: z.string().optional(),
 });
 
 import { WhatsAppService } from "./services/WhatsAppService.js";
@@ -109,6 +110,7 @@ export class IssueService {
           );
         `);
         await prisma.$executeRawUnsafe(`ALTER TABLE "Pole" ADD COLUMN "neighborhood" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Pole" ADD COLUMN "locationUrl" TEXT;`).catch(() => {});
       } catch (e) {
         console.warn("⚠️ Error ensuring Pole table:", e);
       }
@@ -119,6 +121,7 @@ export class IssueService {
         await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "poleAddress" TEXT;`).catch(() => {});
         await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "poleReference" TEXT;`).catch(() => {});
         await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "poleImageUrl" TEXT;`).catch(() => {});
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN "poleLocationUrl" TEXT;`).catch(() => {});
       } catch (e) {
         // Ignore
       }
@@ -207,7 +210,7 @@ export class IssueService {
       imageUrl = await s3Service.uploadFile(file);
     }
 
-    const { whatsapp, poleId, isNearPole, poleAddress, poleReference, poleImageUrl, ...issueData } = data;
+    const { whatsapp, poleId, isNearPole, poleAddress, poleReference, poleImageUrl, poleLocationUrl, ...issueData } = data;
 
     const issue = await prisma.issue.create({
       data: {
@@ -222,6 +225,7 @@ export class IssueService {
         poleAddress,
         poleReference,
         poleImageUrl,
+        poleLocationUrl,
       },
     });
 
@@ -244,6 +248,7 @@ export class IssueService {
         user: {
           select: { name: true, email: true }
         },
+        pole: true,
         history: {
           include: {
             changedBy: { select: { name: true } }

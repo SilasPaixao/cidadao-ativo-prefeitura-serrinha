@@ -10,6 +10,7 @@ export const createPoleSchema = z.object({
   address: z.string().min(1, "Endereço é obrigatório"),
   neighborhood: z.string().optional(),
   reference: z.string().min(1, "Ponto de referência é obrigatório"),
+  locationUrl: z.string().url("Link de localização inválido").or(z.literal("")).optional(),
 });
 
 export class PoleService {
@@ -54,6 +55,25 @@ export class PoleService {
       imageUrl: await s3Service.getFileUrl(pole.imageUrl, this.poleBucket),
       rawImageUrl: pole.imageUrl
     })));
+  }
+
+  async updatePole(id: string, data: Partial<z.infer<typeof createPoleSchema>>, file?: Express.Multer.File) {
+    await IssueService.ensureSchema();
+    
+    const updateData: any = { ...data };
+    
+    if (file) {
+      const pole = await prisma.pole.findUnique({ where: { id } });
+      if (pole?.imageUrl) {
+        await s3Service.deleteFile(pole.imageUrl, this.poleBucket);
+      }
+      updateData.imageUrl = await s3Service.uploadFile(file, { bucket: this.poleBucket, prefix: "poles" });
+    }
+    
+    return prisma.pole.update({
+      where: { id },
+      data: updateData,
+    });
   }
 
   async deletePole(id: string) {
