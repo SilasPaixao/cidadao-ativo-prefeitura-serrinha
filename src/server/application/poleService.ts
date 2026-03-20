@@ -1,7 +1,6 @@
 import prisma from "../infra/database/prisma.js";
 import { z } from "zod";
 import { S3Service } from "../infra/storage/s3.js";
-import { IssueService } from "./issueService.js";
 
 const s3Service = new S3Service();
 
@@ -17,8 +16,6 @@ export class PoleService {
   private poleBucket = process.env.S3_BUCKET_POLES || process.env.S3_BUCKET || "serrinha-poles";
 
   async createPole(data: z.infer<typeof createPoleSchema>, file: Express.Multer.File) {
-    await IssueService.ensureSchema();
-    
     const imageUrl = await s3Service.uploadFile(file, { bucket: this.poleBucket, prefix: "poles" });
     
     return prisma.pole.create({
@@ -30,7 +27,6 @@ export class PoleService {
   }
 
   async getPoleById(id: string) {
-    await IssueService.ensureSchema();
     const pole = await prisma.pole.findUnique({
       where: { id },
     });
@@ -45,7 +41,6 @@ export class PoleService {
   }
 
   async listPoles() {
-    await IssueService.ensureSchema();
     const poles = await prisma.pole.findMany({
       orderBy: { createdAt: "desc" },
     });
@@ -58,8 +53,6 @@ export class PoleService {
   }
 
   async updatePole(id: string, data: Partial<z.infer<typeof createPoleSchema>>, file?: Express.Multer.File) {
-    await IssueService.ensureSchema();
-    
     const updateData: any = { ...data };
     
     if (file) {
@@ -77,8 +70,6 @@ export class PoleService {
   }
 
   async deletePole(id: string) {
-    await IssueService.ensureSchema();
-    
     const pole = await prisma.pole.findUnique({
       where: { id },
     });

@@ -74,9 +74,7 @@ async function startServer() {
   
   // Ensure database schema is ready
   try {
-    const { IssueService } = await import("./src/server/application/issueService.js");
     const { AuthService } = await import("./src/server/application/authService.js");
-    await IssueService.ensureSchema();
     const authService = new AuthService();
     await authService.seedAdmin();
     console.log("✅ Banco de dados verificado e pronto.");

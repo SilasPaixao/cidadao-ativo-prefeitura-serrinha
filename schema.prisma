@@ -7,22 +7,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// UserRole enum alternative for postgresql
-// CITIZEN, GOVERNMENT, ADMIN
+enum UserRole {
+  CITIZEN
+  GOVERNMENT
+  ADMIN
+}
 
-// IssueStatus enum alternative for SQLite
-// PENDING, IN_PROGRESS, RESOLVED, REJECTED
-
-// UserStatus enum alternative for SQLite
-// PENDING, ACTIVE, REJECTED
+enum UserStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+}
 
 model User {
   id            String    @id @default(uuid())
   email         String    @unique
   password      String
   name          String
-  role          String    @default("CITIZEN")
-  status        String    @default("ACTIVE")
+  role          UserRole  @default(CITIZEN)
+  status        UserStatus @default(ACTIVE)
   whatsapp      String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
