@@ -113,12 +113,9 @@ export default function AdminDashboard() {
     address: '',
     neighborhood: '',
     reference: '',
-    locationUrl: '',
   });
   const [poleImage, setPoleImage] = useState<File | null>(null);
   const [savingPole, setSavingPole] = useState(false);
-  const [isEditingPole, setIsEditingPole] = useState(false);
-  const [editingPoleId, setEditingPoleId] = useState<string | null>(null);
   
   // WhatsApp Diagnostics
   const [whatsAppLogs, setWhatsAppLogs] = useState<any[]>([]);
@@ -235,68 +232,35 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  const handleOpenPoleDialog = (pole?: any) => {
-    if (pole) {
-      setNewPole({
-        id: pole.id,
-        address: pole.address,
-        neighborhood: pole.neighborhood || '',
-        reference: pole.reference,
-        locationUrl: pole.locationUrl || '',
-      });
-      setPoleImage(null);
-      setIsEditingPole(true);
-      setEditingPoleId(pole.id);
-    } else {
-      setNewPole({ id: '', address: '', neighborhood: '', reference: '', locationUrl: '' });
-      setPoleImage(null);
-      setIsEditingPole(false);
-      setEditingPoleId(null);
-    }
-    setOpenPoleDialog(true);
-  };
-
   const handleCreatePole = async () => {
-    if (!newPole.id || !newPole.address || !newPole.reference) {
-      alert('Preencha os campos obrigatórios.');
-      return;
-    }
-
-    if (!isEditingPole && !poleImage) {
-      alert('Anexe uma foto do poste.');
+    if (!newPole.id || !newPole.address || !newPole.reference || !poleImage) {
+      alert('Preencha todos os campos e anexe uma foto.');
       return;
     }
 
     setSavingPole(true);
     try {
+      const token = localStorage.getItem('token');
       const formData = new FormData();
       formData.append('id', newPole.id);
       formData.append('address', newPole.address);
       formData.append('neighborhood', newPole.neighborhood);
       formData.append('reference', newPole.reference);
-      formData.append('locationUrl', newPole.locationUrl);
-      if (poleImage) {
-        formData.append('image', poleImage);
-      }
+      formData.append('image', poleImage);
 
-      if (isEditingPole && editingPoleId) {
-        await axios.put(`/api/admin/poles/${editingPoleId}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        alert('Poste atualizado com sucesso!');
-      } else {
-        await axios.post('/api/admin/poles', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        alert('Poste cadastrado com sucesso!');
-      }
+      await axios.post('/api/admin/poles', formData, {
+        headers: { 
+          'Content-Type': 'multipart/form-data'
+        }
+      });
 
       setOpenPoleDialog(false);
-      setNewPole({ id: '', address: '', neighborhood: '', reference: '', locationUrl: '' });
+      setNewPole({ id: '', address: '', neighborhood: '', reference: '' });
       setPoleImage(null);
       fetchPoles();
+      alert('Poste cadastrado com sucesso!');
     } catch (err) {
-      alert(formatErrorMessage(err, 'Erro ao salvar poste'));
+      alert(formatErrorMessage(err, 'Erro ao cadastrar poste'));
     } finally {
       setSavingPole(false);
     }
@@ -1024,7 +988,7 @@ export default function AdminDashboard() {
                 <Button 
                   variant="contained" 
                   startIcon={<LocationOn />} 
-                  onClick={() => handleOpenPoleDialog()}
+                  onClick={() => setOpenPoleDialog(true)}
                   sx={{ borderRadius: 3, fontWeight: 700 }}
                 >
                   Cadastrar Novo Poste
@@ -1041,7 +1005,6 @@ export default function AdminDashboard() {
                         <TableCell sx={{ fontWeight: 800 }}>ENDEREÇO</TableCell>
                         <TableCell sx={{ fontWeight: 800 }}>BAIRRO</TableCell>
                         <TableCell sx={{ fontWeight: 800 }}>REFERÊNCIA</TableCell>
-                        <TableCell sx={{ fontWeight: 800 }}>LOCALIZAÇÃO</TableCell>
                         <TableCell sx={{ fontWeight: 800 }}>LINK QR CODE</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 800 }}>AÇÕES</TableCell>
                       </TableRow>
@@ -1063,22 +1026,6 @@ export default function AdminDashboard() {
                           <TableCell>{pole.neighborhood || '-'}</TableCell>
                           <TableCell sx={{ color: 'text.secondary' }}>{pole.reference}</TableCell>
                           <TableCell>
-                            {pole.locationUrl ? (
-                              <Tooltip title="Abrir Localização no Google Maps">
-                                <IconButton 
-                                  size="small" 
-                                  color="primary" 
-                                  onClick={() => window.open(pole.locationUrl, '_blank')}
-                                  sx={{ bgcolor: 'rgba(0,74,141,0.05)' }}
-                                >
-                                  <OpenInNew fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            ) : (
-                              <Typography variant="caption" color="text.disabled">Não informado</Typography>
-                            )}
-                          </TableCell>
-                          <TableCell>
                             <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'rgba(0,0,0,0.05)', p: 0.5, borderRadius: 1 }}>
                               {`${window.location.origin}/?p=${pole.id}`}
                             </Typography>
@@ -1090,14 +1037,9 @@ export default function AdminDashboard() {
                             </IconButton>
                           </TableCell>
                           <TableCell align="right">
-                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                              <IconButton size="small" color="primary" onClick={() => handleOpenPoleDialog(pole)}>
-                                <Edit sx={{ fontSize: 18 }} />
-                              </IconButton>
-                              <IconButton size="small" color="error" onClick={() => handleDeletePole(pole.id)}>
-                                <Delete sx={{ fontSize: 18 }} />
-                              </IconButton>
-                            </Box>
+                            <IconButton color="error" onClick={() => handleDeletePole(pole.id)}>
+                              <Delete />
+                            </IconButton>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1367,21 +1309,7 @@ export default function AdminDashboard() {
 
             {selectedIssue?.imageUrl && (
               <Box sx={{ position: 'relative' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase', display: 'block' }}>EVIDÊNCIA FOTOGRÁFICA</Typography>
-                  {(selectedIssue.pole?.locationUrl || selectedIssue.poleLocationUrl) && (
-                    <Button 
-                      variant="contained" 
-                      size="small" 
-                      color="success"
-                      startIcon={<OpenInNew />}
-                      sx={{ borderRadius: 2, fontWeight: 700, textTransform: 'none', fontSize: '0.7rem', py: 0.5 }}
-                      onClick={() => window.open(selectedIssue.pole?.locationUrl || selectedIssue.poleLocationUrl, '_blank')}
-                    >
-                      Ver Localização do Poste
-                    </Button>
-                  )}
-                </Box>
+                <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase', mb: 1, display: 'block' }}>EVIDÊNCIA FOTOGRÁFICA</Typography>
                 <Box 
                   onClick={() => setOpenImageModal(true)}
                   sx={{ 
@@ -1444,17 +1372,6 @@ export default function AdminDashboard() {
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>ID: {selectedIssue.poleId}</Typography>
                     <Typography variant="body2">Endereço: {selectedIssue.poleAddress}</Typography>
                     <Typography variant="body2">Ref: {selectedIssue.poleReference}</Typography>
-                    {(selectedIssue.pole?.locationUrl || selectedIssue.poleLocationUrl) && (
-                      <Button 
-                        variant="text" 
-                        size="small" 
-                        startIcon={<OpenInNew />}
-                        onClick={() => window.open(selectedIssue.pole?.locationUrl || selectedIssue.poleLocationUrl, '_blank')}
-                        sx={{ mt: 0.5, p: 0, minWidth: 0, textTransform: 'none', fontWeight: 700, fontSize: '0.75rem' }}
-                      >
-                        Ver no Google Maps
-                      </Button>
-                    )}
                     <Typography variant="caption" color={selectedIssue.isNearPole ? "success.main" : "error.main"} sx={{ fontWeight: 800, mt: 1, display: 'block' }}>
                       {selectedIssue.isNearPole ? "✓ Cidadão confirmou estar próximo a este poste" : "✗ Cidadão informou NÃO estar próximo a este poste"}
                     </Typography>
@@ -1484,19 +1401,7 @@ export default function AdminDashboard() {
                 size="small" 
                 startIcon={<OpenInNew />}
                 sx={{ mt: 1, fontWeight: 700, textTransform: 'none' }}
-                onClick={() => {
-                  let addressToSearch = selectedIssue.address || '';
-                  // O ponto de referência é mantido para exibição no painel, 
-                  // mas removido aqui (texto entre parênteses) para não confundir a busca do Google Maps
-                  if (addressToSearch.includes('(')) {
-                    addressToSearch = addressToSearch.split('(')[0].trim();
-                  }
-                  
-                  const query = addressToSearch 
-                    ? `${addressToSearch}, Serrinha, BA` 
-                    : `${selectedIssue.latitude},${selectedIssue.longitude}`;
-                  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
-                }}
+                onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${selectedIssue.latitude},${selectedIssue.longitude}`, '_blank')}
               >
                 Abrir no Google Maps
               </Button>
@@ -1769,9 +1674,7 @@ export default function AdminDashboard() {
         onClose={() => setOpenPoleDialog(false)}
         PaperProps={{ sx: { borderRadius: 5, p: 1, minWidth: 400 } }}
       >
-        <DialogTitle sx={{ fontWeight: 900, color: 'primary.main' }}>
-          {isEditingPole ? 'Editar Poste' : 'Cadastrar Novo Poste'}
-        </DialogTitle>
+        <DialogTitle sx={{ fontWeight: 900, color: 'primary.main' }}>Cadastrar Novo Poste</DialogTitle>
         <DialogContent>
           <Stack spacing={3} sx={{ mt: 1 }}>
             <TextField
@@ -1779,7 +1682,6 @@ export default function AdminDashboard() {
               label="ID do Poste (Ex: 10, 101, A1)"
               value={newPole.id}
               onChange={(e) => setNewPole({ ...newPole, id: e.target.value })}
-              disabled={isEditingPole}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
             />
             <TextField
@@ -1803,20 +1705,12 @@ export default function AdminDashboard() {
               onChange={(e) => setNewPole({ ...newPole, reference: e.target.value })}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
             />
-            <TextField
-              fullWidth
-              label="Link de Localização (Google Maps)"
-              placeholder="https://maps.app.goo.gl/..."
-              value={newPole.locationUrl}
-              onChange={(e) => setNewPole({ ...newPole, locationUrl: e.target.value })}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }}
-            />
             <Button
               variant="outlined"
               component="label"
               sx={{ borderRadius: 3, py: 1.5, textTransform: 'none', fontWeight: 700 }}
             >
-              {poleImage ? `Foto: ${poleImage.name}` : (isEditingPole ? 'Alterar Foto (Opcional)' : 'Anexar Foto Real do Poste')}
+              {poleImage ? `Foto: ${poleImage.name}` : 'Anexar Foto Real do Poste'}
               <input
                 type="file"
                 hidden
@@ -1834,7 +1728,7 @@ export default function AdminDashboard() {
             disabled={savingPole}
             sx={{ borderRadius: 2, fontWeight: 800, px: 4 }}
           >
-            {savingPole ? <CircularProgress size={24} /> : (isEditingPole ? 'Salvar Alterações' : 'Cadastrar Poste')}
+            {savingPole ? <CircularProgress size={24} /> : 'Cadastrar Poste'}
           </Button>
         </DialogActions>
       </Dialog>

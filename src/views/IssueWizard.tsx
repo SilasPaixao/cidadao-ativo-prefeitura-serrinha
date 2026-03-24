@@ -199,7 +199,6 @@ export default function IssueWizard() {
         payload.poleAddress = poleInfo.address;
         payload.poleReference = poleInfo.reference;
         payload.poleImageUrl = poleInfo.rawImageUrl;
-        payload.poleLocationUrl = poleInfo.locationUrl;
       }
 
       data.append('data', JSON.stringify(payload));
@@ -247,21 +246,6 @@ export default function IssueWizard() {
               <strong>ID:</strong> {poleInfo.id}<br />
               <strong>Endereço:</strong> {poleInfo.address}<br />
               <strong>Ref:</strong> {poleInfo.reference}
-              {poleInfo.locationUrl && (
-                <>
-                  <br />
-                  <Button 
-                    variant="text" 
-                    size="small" 
-                    href={poleInfo.locationUrl} 
-                    target="_blank" 
-                    startIcon={<LocationOn />}
-                    sx={{ mt: 1, textTransform: 'none' }}
-                  >
-                    Ver no Google Maps
-                  </Button>
-                </>
-              )}
             </Typography>
 
             <Stack direction="row" spacing={2} justifyContent="center">

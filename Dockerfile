@@ -10,4 +10,4 @@ COPY . .
 RUN npm run build
 
 ENV NODE_ENV=production
-CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
+CMD ["npm", "start"]

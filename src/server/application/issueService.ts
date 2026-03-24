@@ -6,18 +6,17 @@ import { format } from "date-fns";
 export const createIssueSchema = z.object({
   category: z.string({ message: "Categoria é obrigatória" }).min(1, "Categoria é obrigatória"),
   description: z.string({ message: "Descrição é obrigatória" }).min(1, "Descrição é obrigatória"),
-  latitude: z.coerce.number({ message: "Latitude é obrigatória" }),
-  longitude: z.coerce.number({ message: "Longitude é obrigatória" }),
+  latitude: z.number({ message: "Latitude é obrigatória" }),
+  longitude: z.number({ message: "Longitude é obrigatória" }),
   address: z.string().optional(),
   whatsapp: z.string().optional().refine(val => !val || /^\d{10,15}$/.test(val.replace(/\D/g, '')), {
     message: "WhatsApp deve conter apenas números com DDD (10-11 dígitos)"
   }),
   poleId: z.string().optional().or(z.literal("")),
-  isNearPole: z.coerce.boolean().optional(),
+  isNearPole: z.boolean().optional(),
   poleAddress: z.string().optional(),
   poleReference: z.string().optional(),
   poleImageUrl: z.string().optional(),
-  poleLocationUrl: z.string().optional(),
 });
 
 import { WhatsAppService } from "./services/WhatsAppService.js";
@@ -26,6 +25,169 @@ const s3Service = new S3Service();
 const whatsappService = new WhatsAppService();
 
 export class IssueService {
+  private static columnChecked = false;
+
+  public static async ensureSchema() {
+    if (IssueService.columnChecked) return;
+    try {
+      console.log("Checking and ensuring database schema...");
+      
+      // 1. Ensure User table exists (Critical for Auth)
+      try {
+        console.log("Ensuring User table...");
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "User" (
+            "id" TEXT NOT NULL,
+            "email" TEXT NOT NULL,
+            "password" TEXT NOT NULL,
+            "name" TEXT NOT NULL,
+            "role" TEXT NOT NULL DEFAULT 'CITIZEN',
+            "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+            "whatsapp" TEXT,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "User_pkey" PRIMARY KEY ("id")
+          );
+        `);
+        await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");`);
+      } catch (e) {
+        console.warn("⚠️ Error ensuring User table:", e);
+      }
+
+      // 2. Ensure Issue table exists
+      try {
+        console.log("Ensuring Issue table...");
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "Issue" (
+            "id" TEXT NOT NULL,
+            "protocol" TEXT NOT NULL,
+            "category" TEXT NOT NULL,
+            "description" TEXT NOT NULL,
+            "latitude" DOUBLE PRECISION NOT NULL,
+            "longitude" DOUBLE PRECISION NOT NULL,
+            "address" TEXT,
+            "reporterEmail" TEXT,
+            "whatsapp" TEXT,
+            "imageUrl" TEXT,
+            "status" TEXT NOT NULL DEFAULT 'PENDING',
+            "userId" TEXT,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "Issue_pkey" PRIMARY KEY ("id")
+          );
+        `);
+        await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "Issue_protocol_key" ON "Issue"("protocol");`);
+      } catch (e) {
+        console.warn("⚠️ Error ensuring Issue table:", e);
+      }
+
+      // 3. Ensure columns and other tables...
+      try {
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "reporterEmail" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "whatsapp" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "address" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "userId" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'ACTIVE';`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "whatsapp" TEXT;`);
+      } catch (e) {
+        console.warn("⚠️ Error altering tables:", e);
+      }
+
+      try {
+        console.log("Ensuring Pole table...");
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "Pole" (
+            "id" TEXT NOT NULL,
+            "address" TEXT NOT NULL,
+            "reference" TEXT NOT NULL,
+            "imageUrl" TEXT NOT NULL,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "Pole_pkey" PRIMARY KEY ("id")
+          );
+        `);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Pole" ADD COLUMN IF NOT EXISTS "neighborhood" TEXT;`);
+      } catch (e) {
+        console.warn("⚠️ Error ensuring Pole table:", e);
+      }
+
+      try {
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "poleId" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "isNearPole" BOOLEAN;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "poleAddress" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "poleReference" TEXT;`);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "Issue" ADD COLUMN IF NOT EXISTS "poleImageUrl" TEXT;`);
+      } catch (e) {
+        console.warn("⚠️ Error adding pole columns to Issue:", e);
+      }
+
+      try {
+        console.log("Ensuring IssueStatusHistory table...");
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "IssueStatusHistory" (
+            "id" TEXT NOT NULL,
+            "issueId" TEXT NOT NULL,
+            "status" TEXT NOT NULL,
+            "comment" TEXT,
+            "changedById" TEXT NOT NULL,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "IssueStatusHistory_pkey" PRIMARY KEY ("id")
+          );
+        `);
+      } catch (e) {
+        console.warn("⚠️ Error ensuring IssueStatusHistory table:", e);
+      }
+      
+      try {
+        console.log("Ensuring WhatsAppLog table...");
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "WhatsAppLog" (
+            "id" TEXT NOT NULL,
+            "issueId" TEXT,
+            "phoneNumber" TEXT NOT NULL,
+            "message" TEXT NOT NULL,
+            "imageUrl" TEXT,
+            "status" TEXT NOT NULL,
+            "lastError" TEXT,
+            "attempts" INTEGER NOT NULL DEFAULT 0,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "sentAt" TIMESTAMP(3),
+            CONSTRAINT "WhatsAppLog_pkey" PRIMARY KEY ("id")
+          );
+        `);
+        await prisma.$executeRawUnsafe(`ALTER TABLE "WhatsAppLog" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT;`);
+      } catch (e) {
+        console.warn("⚠️ Error ensuring WhatsAppLog table:", e);
+      }
+
+      try {
+        console.log("Ensuring PasswordResetToken table...");
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "PasswordResetToken" (
+            "id" TEXT NOT NULL,
+            "token" TEXT NOT NULL,
+            "email" TEXT NOT NULL,
+            "expiresAt" TIMESTAMP(3) NOT NULL,
+            "used" BOOLEAN NOT NULL DEFAULT false,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            CONSTRAINT "PasswordResetToken_pkey" PRIMARY KEY ("id")
+          );
+        `);
+        await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "PasswordResetToken_token_key" ON "PasswordResetToken"("token");`);
+        await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "PasswordResetToken_token_idx" ON "PasswordResetToken"("token");`);
+      } catch (e) {
+        console.warn("⚠️ Error ensuring PasswordResetToken table:", e);
+      }
+
+      console.log("Database schema check completed.");
+      IssueService.columnChecked = true;
+    } catch (e: any) {
+      console.error("❌ Could not ensure database schema:", e);
+      if (e.code) console.error("Prisma Error Code:", e.code);
+      if (e.meta) console.error("Prisma Error Meta:", JSON.stringify(e.meta));
+    }
+  }
+
   private generateProtocol(): string {
     const date = format(new Date(), "yyyyMMdd");
     const random = Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -37,6 +199,7 @@ export class IssueService {
   }
 
   async createIssue(data: z.infer<typeof createIssueSchema>, userId: string | null, file?: Express.Multer.File) {
+    await IssueService.ensureSchema();
     const protocol = this.generateProtocol();
     let imageUrl: string | undefined;
 
@@ -44,7 +207,7 @@ export class IssueService {
       imageUrl = await s3Service.uploadFile(file);
     }
 
-    const { whatsapp, poleId, isNearPole, poleAddress, poleReference, poleImageUrl, poleLocationUrl, ...issueData } = data;
+    const { whatsapp, poleId, isNearPole, poleAddress, poleReference, poleImageUrl, ...issueData } = data;
 
     const issue = await prisma.issue.create({
       data: {
@@ -59,7 +222,6 @@ export class IssueService {
         poleAddress,
         poleReference,
         poleImageUrl,
-        poleLocationUrl,
       },
     });
 
@@ -75,13 +237,13 @@ export class IssueService {
   }
 
   async getIssues(filters: any) {
+    await IssueService.ensureSchema();
     const issues = await prisma.issue.findMany({
       where: filters,
       include: {
         user: {
           select: { name: true, email: true }
         },
-        pole: true,
         history: {
           include: {
             changedBy: { select: { name: true } }

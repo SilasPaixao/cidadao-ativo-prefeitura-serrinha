@@ -3,7 +3,6 @@ import jwt from "jsonwebtoken";
 import prisma from "../infra/database/prisma.js";
 import { z } from "zod";
 import { IssueService } from "./issueService.js";
-import { UserRole, UserStatus } from "@prisma/client";
 
 const JWT_SECRET = process.env.JWT_SECRET || "super-secret";
 
@@ -32,6 +31,8 @@ const emailService = new EmailService();
 
 export class AuthService {
   async seedAdmin() {
+    await IssueService.ensureSchema();
+    
     const adminEmail = process.env.DEFAULT_ADMIN_EMAIL;
     const adminPassword = process.env.DEFAULT_ADMIN_PASSWORD;
     const adminName = process.env.DEFAULT_ADMIN_NAME || "Administrador";
@@ -41,13 +42,13 @@ export class AuthService {
       return;
     }
 
-    // Verifica se o administrador padrão já existe pelo e-mail
-    const existingAdmin = await prisma.user.findUnique({
-      where: { email: adminEmail.toLowerCase().trim() }
+    // Verifica se já existe QUALQUER administrador no sistema
+    const anyAdmin = await prisma.user.findFirst({
+      where: { role: "ADMIN" }
     });
 
-    if (existingAdmin) {
-      console.log(`✅ Administrador padrão (${adminEmail}) já existe. Pulando criação.`);
+    if (anyAdmin) {
+      console.log("✅ Já existe um administrador no sistema. Pulando criação do usuário padrão.");
       return;
     }
 
@@ -60,8 +61,8 @@ export class AuthService {
           email: adminEmail.toLowerCase().trim(),
           password: hashedPassword,
           name: adminName,
-          role: UserRole.ADMIN,
-          status: UserStatus.ACTIVE,
+          role: "ADMIN",
+          status: "ACTIVE",
         },
       });
       console.log("✅ Usuário administrador padrão criado com sucesso.");
@@ -71,6 +72,7 @@ export class AuthService {
   }
 
   async register(data: z.infer<typeof registerSchema>) {
+    await IssueService.ensureSchema();
     const email = data.email.trim().toLowerCase();
     const password = data.password.trim();
 
@@ -83,12 +85,11 @@ export class AuthService {
     }
 
     const hashedPassword = await argon2.hash(password);
-    const status = data.role === "GOVERNMENT" ? UserStatus.PENDING : UserStatus.ACTIVE;
+    const status = data.role === "GOVERNMENT" ? "PENDING" : "ACTIVE";
 
     const user = await prisma.user.create({
       data: {
         ...data,
-        role: data.role as UserRole,
         email,
         password: hashedPassword,
         status,
@@ -110,6 +111,7 @@ export class AuthService {
   }
 
   async login(data: z.infer<typeof loginSchema>) {
+    await IssueService.ensureSchema();
     const email = data.email.trim().toLowerCase();
     const password = data.password.trim();
 
@@ -125,18 +127,17 @@ export class AuthService {
       throw new Error("Credenciais inválidas");
     }
 
-    console.log(`🔍 Tentando login para: ${email} (Role: ${user.role}, Status: ${user.status})`);
     const isPasswordValid = await argon2.verify(user.password, password);
     if (!isPasswordValid) {
       console.log(`🔍 Login falhou: Senha incorreta para (${email})`);
       throw new Error("Credenciais inválidas");
     }
 
-    if (user.status === UserStatus.PENDING && user.role !== UserRole.ADMIN) {
+    if (user.status === "PENDING" && user.role !== "ADMIN") {
       throw new Error("Seu cadastro ainda está pendente de aprovação.");
     }
 
-    if (user.status === UserStatus.REJECTED && user.role !== UserRole.ADMIN) {
+    if (user.status === "REJECTED" && user.role !== "ADMIN") {
       throw new Error("Seu pedido de cadastro foi rejeitado.");
     }
 
@@ -144,11 +145,12 @@ export class AuthService {
   }
 
   async getPendingAdmins() {
+    await IssueService.ensureSchema();
     await this.cleanupExpiredRequests();
     return prisma.user.findMany({
       where: {
-        role: UserRole.GOVERNMENT,
-        status: UserStatus.PENDING,
+        role: "GOVERNMENT",
+        status: "PENDING",
       },
       orderBy: { createdAt: "desc" },
     });
@@ -162,7 +164,7 @@ export class AuthService {
 
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { status: UserStatus.ACTIVE },
+      data: { status: "ACTIVE" },
     });
 
     if (user.whatsapp) {
@@ -194,6 +196,7 @@ export class AuthService {
   }
 
   async forgotPassword(email: string) {
+    await IssueService.ensureSchema();
     const normalizedEmail = email.trim().toLowerCase();
     console.log(`🔍 Recuperação de senha solicitada para: ${normalizedEmail}`);
     
@@ -240,6 +243,8 @@ export class AuthService {
   }
 
   async resetPassword(token: string, newPassword: string) {
+    await IssueService.ensureSchema();
+    
     const resetToken = await prisma.passwordResetToken.findUnique({
       where: { token },
     });
@@ -271,7 +276,7 @@ export class AuthService {
 
     await prisma.user.deleteMany({
       where: {
-        status: UserStatus.PENDING,
+        status: "PENDING",
         createdAt: {
           lt: fifteenDaysAgo,
         },

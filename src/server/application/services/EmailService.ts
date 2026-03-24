@@ -8,7 +8,7 @@ export class EmailService {
   constructor() {
     this.apiKey = process.env.BREVO_API_KEY || "";
     this.senderName = process.env.BREVO_SENDER_NAME || "Prefeitura";
-    this.senderEmail = process.env.BREVO_SENDER_EMAIL || "noreply@serrinhaconectada.tech";
+    this.senderEmail = process.env.BREVO_SENDER_EMAIL || "silas.paixao873@gmail.com";
   }
 
   async sendPasswordResetEmail(toEmail: string, userName: string, resetUrl: string) {

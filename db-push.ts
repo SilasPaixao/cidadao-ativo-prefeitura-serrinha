@@ -2,7 +2,7 @@ import { execSync } from 'child_process';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const url = process.env.DATABASE_URL || 'file:./prisma/dev.db';
+const url = process.env.DATABASE_URL || 'postgresql://postgres:bfuI6kAkxrikA1Gr@db.ezlbmzixlnhxlburwdqy.supabase.co:5432/postgres';
 
 console.log('Using DATABASE_URL:', url.replace(/:[^:@]+@/, ':****@'));
 
